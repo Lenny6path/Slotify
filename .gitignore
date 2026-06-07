@@ -1,0 +1,14 @@
+# IDE PhpStorm
+.idea/
+
+# Mac / système
+.DS_Store
+
+# Logs
+*.log
+
+# Variables sensibles
+.env
+
+# Dépendances (si un jour tu utilises Composer)
+vendor/
