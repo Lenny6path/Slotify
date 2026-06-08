@@ -2,9 +2,6 @@
 
 require_once __DIR__ . '/../config/db.php';
 
-var_dump(isset($pdo));
-exit;
-
 session_start();
 
 if (!isset($_SESSION["user_id"])) {
