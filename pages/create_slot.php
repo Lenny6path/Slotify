@@ -1,9 +1,6 @@
 <?php
 
-require_once __DIR__ . '/../config/db.php';
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . '/../config/init.php';
 
 if (!isset($_SESSION["user_id"])) {
     header("Location: login.php");
@@ -25,11 +22,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     ");
 
     $stmt->execute([
-        $_SESSION["user_id"],
-        $_POST["title"],
-        $_POST["date"],
-        $_POST["start_time"],
-        $_POST["end_time"]
+            $_SESSION["user_id"],
+            $_POST["title"],
+            $_POST["date"],
+            $_POST["start_time"],
+            $_POST["end_time"]
     ]);
 
     header("Location: dashboard.php");

@@ -1,8 +1,6 @@
 <?php
-require_once "../config/db.php";
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+
+require_once __DIR__ . '/../config/init.php';
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
@@ -18,10 +16,24 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 }
 ?>
 
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register</title>
+</head>
+<body>
+
+<h2>Register</h2>
+
 <form method="POST">
-    <h2>Register</h2>
-    <input name="name" placeholder="Name" required>
-    <input name="email" placeholder="Email" required>
-    <input name="password" type="password" placeholder="Password" required>
+
+    <input name="name" placeholder="Name" required><br><br>
+    <input name="email" placeholder="Email" required><br><br>
+    <input name="password" type="password" placeholder="Password" required><br><br>
+
     <button type="submit">Create account</button>
+
 </form>
+
+</body>
+</html>
