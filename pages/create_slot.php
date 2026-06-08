@@ -1,7 +1,5 @@
 <?php
-
 require_once __DIR__ . '/../config/db.php';
-
 session_start();
 
 if (!isset($_SESSION["user_id"])) {
@@ -17,11 +15,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     ");
 
     $stmt->execute([
-        $_SESSION["user_id"],
-        $_POST["title"],
-        $_POST["date"],
-        $_POST["start_time"],
-        $_POST["end_time"]
+            $_SESSION["user_id"],
+            $_POST["title"],
+            $_POST["date"],
+            $_POST["start_time"],
+            $_POST["end_time"]
     ]);
 
     header("Location: dashboard.php");
@@ -29,19 +27,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 }
 ?>
 
-
-
-
 <form method="POST">
     <h2>Créer un créneau</h2>
 
-    <input name="title" placeholder="Titre du rendez-vous" required>
+    <input name="title" placeholder="Titre" required>
     <input type="date" name="date" required>
     <input type="time" name="start_time" required>
     <input type="time" name="end_time" required>
 
     <button type="submit">Créer</button>
 </form>
-
-
-
