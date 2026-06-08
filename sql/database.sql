@@ -13,9 +13,11 @@ CREATE TABLE users (
 CREATE TABLE slots (
                        id INT AUTO_INCREMENT PRIMARY KEY,
                        user_id INT NOT NULL,
+                       title VARCHAR(255) NOT NULL,
                        date DATE NOT NULL,
-                       time TIME NOT NULL,
-                       status ENUM('available', 'booked') DEFAULT 'available',
+                       start_time TIME NOT NULL,
+                       end_time TIME NOT NULL,
+                       is_booked BOOLEAN DEFAULT 0,
                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -25,3 +27,4 @@ CREATE TABLE bookings (
                           client_name VARCHAR(100) NOT NULL,
                           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
