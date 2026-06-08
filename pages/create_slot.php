@@ -1,5 +1,10 @@
 <?php
+
 require_once __DIR__ . '/../config/db.php';
+
+var_dump(isset($pdo));
+exit;
+
 session_start();
 
 if (!isset($_SESSION["user_id"])) {
@@ -27,6 +32,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 }
 ?>
 
+
+
+
 <form method="POST">
     <h2>Créer un créneau</h2>
 
@@ -37,3 +45,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     <button type="submit">Créer</button>
 </form>
+
+
+
