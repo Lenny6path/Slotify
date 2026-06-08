@@ -1,8 +1,6 @@
 <?php
-require_once "../config/db.php";
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+
+require_once __DIR__ . '/../config/init.php';
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
@@ -14,11 +12,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $user = $stmt->fetch();
 
     if ($user && password_verify($password, $user["password"])) {
+
         $_SESSION["user_id"] = $user["id"];
         $_SESSION["user_name"] = $user["name"];
 
         header("Location: dashboard.php");
         exit;
+
     } else {
         echo "Identifiants incorrects";
     }
@@ -27,7 +27,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 <form method="POST">
     <h2>Login</h2>
+
     <input name="email" placeholder="Email" required>
     <input name="password" type="password" placeholder="Password" required>
+
     <button type="submit">Login</button>
 </form>
