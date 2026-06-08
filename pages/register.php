@@ -1,39 +1,119 @@
 <?php
 
+// ============================================================
+// register.php — Inscription d'un professionnel
+// ============================================================
+
 require_once __DIR__ . '/../config/init.php';
+require_once __DIR__ . '/../config/layout.php';
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-
-    $name = $_POST["name"];
-    $email = $_POST["email"];
-    $password = password_hash($_POST["password"], PASSWORD_DEFAULT);
-
-    $stmt = $pdo->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
-    $stmt->execute([$name, $email, $password]);
-
-    header("Location: login.php");
-    exit;
+if (!empty($_SESSION['user_id'])) {
+    redirect('dashboard.php');
 }
+
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    verifyCsrf();
+
+    $name        = trim(isset($_POST['name'])     ? $_POST['name']     : '');
+    $email       = trim(isset($_POST['email'])    ? $_POST['email']    : '');
+    $passwordRaw =     (isset($_POST['password']) ? $_POST['password'] : '');
+
+    // --- Validation ---
+    if ($name === '' || $email === '' || $passwordRaw === '') {
+        $error = "Tous les champs sont obligatoires.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Adresse email invalide.";
+    } elseif (strlen($passwordRaw) < 6) {
+        $error = "Le mot de passe doit faire au moins 6 caractères.";
+    } else {
+        // Vérifier doublon email
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+        $stmt->execute([$email]);
+
+        if ($stmt->fetch()) {
+            $error = "Cet email est déjà utilisé.";
+        } else {
+            $password = password_hash($passwordRaw, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
+            $stmt->execute([$name, $email, $password]);
+            redirect('login.php');
+        }
+    }
+}
+
+layoutHeader("Créer un compte", false);
 ?>
 
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Register</title>
-</head>
-<body>
+    <div class="min-h-[80vh] flex items-center justify-center">
+        <div class="w-full max-w-md">
 
-<h2>Register</h2>
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-blue-600 tracking-tight">Slotify</h1>
+                <p class="text-gray-500 mt-1 text-sm">Gestion de rendez-vous simplifiée</p>
+            </div>
 
-<form method="POST">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+                <h2 class="text-xl font-semibold text-gray-800 mb-6">Créer un compte</h2>
 
-    <input name="name" placeholder="Name" required><br><br>
-    <input name="email" placeholder="Email" required><br><br>
-    <input name="password" type="password" placeholder="Password" required><br><br>
+                <?php if ($error !== ''): ?>
+                    <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                        <?= e($error) ?>
+                    </div>
+                <?php endif; ?>
 
-    <button type="submit">Create account</button>
+                <form method="POST" novalidate>
+                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
 
-</form>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nom complet</label>
+                        <input
+                                type="text" name="name"
+                                value="<?= e(isset($_POST['name']) ? $_POST['name'] : '') ?>"
+                                placeholder="Jean Dupont"
+                                required
+                                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                        >
+                    </div>
 
-</body>
-</html>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email professionnel</label>
+                        <input
+                                type="email" name="email"
+                                value="<?= e(isset($_POST['email']) ? $_POST['email'] : '') ?>"
+                                placeholder="vous@exemple.fr"
+                                required
+                                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                        >
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
+                        <input
+                                type="password" name="password"
+                                placeholder="Min. 6 caractères"
+                                required
+                                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                        >
+                    </div>
+
+                    <button
+                            type="submit"
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition text-sm"
+                    >
+                        Créer mon compte
+                    </button>
+                </form>
+            </div>
+
+            <p class="text-center text-sm text-gray-500 mt-4">
+                Déjà un compte ?
+                <a href="login.php" class="text-blue-600 hover:underline font-medium">Se connecter</a>
+            </p>
+
+        </div>
+    </div>
+
+<?php layoutFooter(); ?>
