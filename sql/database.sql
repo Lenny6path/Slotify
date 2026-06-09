@@ -1,48 +1,53 @@
 -- ============================================================
--- SLOTIFY — Base de données
+-- SLOTIFY — Base de données complète v2
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS slotify_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE slotify_db;
 
 -- ------------------------------------------------------------
--- Table : users (professionnels)
+-- Table : users
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
-    id         INT AUTO_INCREMENT PRIMARY KEY,
-    name       VARCHAR(100)  NOT NULL,
+                                     id         INT AUTO_INCREMENT PRIMARY KEY,
+                                     name       VARCHAR(100)  NOT NULL,
     email      VARCHAR(150)  UNIQUE NOT NULL,
     password   VARCHAR(255)  NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+    bio        TEXT          DEFAULT NULL,
+    created_at TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
--- Table : slots (créneaux)
--- booked_by  → FK vers users.id (client qui a réservé)
+-- Table : slots
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS slots (
-    id         INT AUTO_INCREMENT PRIMARY KEY,
-    user_id    INT          NOT NULL,                 -- professionnel propriétaire
-    title      VARCHAR(255) NOT NULL,
+                                     id         INT AUTO_INCREMENT PRIMARY KEY,
+                                     user_id    INT          NOT NULL,
+                                     title      VARCHAR(255) NOT NULL,
     date       DATE         NOT NULL,
     start_time TIME         NOT NULL,
     end_time   TIME         NOT NULL,
     is_booked  BOOLEAN      DEFAULT 0,
-    booked_by  INT          DEFAULT NULL,             -- ← colonne manquante corrigée
+    booked_by  INT          DEFAULT NULL,
     created_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id)   REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (booked_by) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
+    ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------
--- Table : bookings (historique des réservations)
--- On garde les deux pour l'historique complet
+-- Table : bookings
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS bookings (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    slot_id     INT          NOT NULL,
-    booker_id   INT          NOT NULL,               -- client
-    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (slot_id)   REFERENCES slots(id)   ON DELETE CASCADE,
+                                        id          INT AUTO_INCREMENT PRIMARY KEY,
+                                        slot_id     INT          NOT NULL,
+                                        booker_id   INT          NOT NULL,
+                                        created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+                                        FOREIGN KEY (slot_id)   REFERENCES slots(id)   ON DELETE CASCADE,
     FOREIGN KEY (booker_id) REFERENCES users(id)   ON DELETE CASCADE
-) ENGINE=InnoDB;
+    ) ENGINE=InnoDB;
+
+-- ------------------------------------------------------------
+-- Ajout colonne bio si migration depuis v1
+-- (ignorer si table vient d'être créée)
+-- ------------------------------------------------------------
+-- ALTER TABLE users ADD COLUMN bio TEXT DEFAULT NULL AFTER password;
