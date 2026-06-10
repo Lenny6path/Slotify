@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($errors)) {
             $pdo->prepare("UPDATE users SET name = ?, email = ?, bio = ? WHERE id = ?")
-                ->execute([$name, $email, $bio, $userId]);
+                    ->execute([$name, $email, $bio, $userId]);
             $_SESSION['user_name'] = $name;
             flashSet('success', 'Profil mis à jour avec succès !');
             redirect('profile.php');
@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($errors)) {
             $pdo->prepare("UPDATE users SET password = ? WHERE id = ?")
-                ->execute([password_hash($new, PASSWORD_DEFAULT), $userId]);
+                    ->execute([password_hash($new, PASSWORD_DEFAULT), $userId]);
             flashSet('success', 'Mot de passe modifié avec succès !');
             redirect('profile.php');
         }
@@ -98,9 +98,10 @@ layoutHeader("Mon profil");
                     <?= avatar($user['name']) ?>
                 </div>
                 <div>
-                    <p class="font-semibold text-gray-800"><?= e($user['name']) ?></p>
+                    <p class="font-semibold text-gray-800 flex items-center gap-2"><?= e($user['name']) ?> <?= planBadge($pdo) ?></p>
                     <p class="text-sm text-gray-400"><?= e($user['email']) ?></p>
                     <p class="text-xs text-gray-300 mt-0.5">Membre depuis <?= date('M Y', strtotime($user['created_at'])) ?></p>
+                    <a href="upgrade.php" class="text-xs text-blue-500 hover:underline">Gérer mon plan →</a>
                 </div>
             </div>
 

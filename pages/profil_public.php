@@ -1,19 +1,29 @@
 <?php
 
 // ============================================================
-// profil_public.php — Page publique d'un professionnel
-// Accessible sans connexion, partageable par lien
+// profil_public.php — La page "vitrine" d'un professionnel
+//
+// C'est LE lien que le pro partage à ses clients :
+//   profil_public.php?id=3
+// Elle est accessible SANS être connecté (volontaire : un
+// client doit pouvoir consulter les créneaux avant de créer
+// un compte). La connexion n'est exigée qu'au moment de réserver.
 // ============================================================
 
 require_once __DIR__ . '/../config/init.php';
 require_once __DIR__ . '/../config/layout.php';
 
+// Le cast (int) neutralise toute tentative d'injection dans l'URL :
+// "3abc" devient 3, "abc" devient 0
 $proId = (int) ($_GET['id'] ?? 0);
 if ($proId <= 0) {
-    redirect('index.php');
+    // index.php est à la racine du projet, un niveau au-dessus
+    // du dossier pages/, d'où le ../
+    redirect('../index.php');
 }
 
-// Récupérer le professionnel
+// On ne sélectionne QUE les colonnes publiques : surtout pas
+// l'email ni le hash du mot de passe sur une page publique !
 $stmtPro = $pdo->prepare("SELECT id, name, bio, created_at FROM users WHERE id = ? LIMIT 1");
 $stmtPro->execute([$proId]);
 $pro = $stmtPro->fetch();
@@ -23,7 +33,8 @@ if (!$pro) {
     die("Professionnel introuvable.");
 }
 
-// Récupérer ses créneaux disponibles (non réservés, futurs)
+// Les créneaux affichés ici : disponibles ET futurs uniquement.
+// Pas la peine de montrer les créneaux réservés ou expirés à un client.
 $stmtSlots = $pdo->prepare("
     SELECT * FROM slots
     WHERE user_id = ? AND is_booked = 0 AND date >= CURDATE()
@@ -32,20 +43,21 @@ $stmtSlots = $pdo->prepare("
 $stmtSlots->execute([$proId]);
 $slots = $stmtSlots->fetchAll();
 
-// Grouper par date
+// On regroupe les créneaux par jour pour pouvoir afficher
+// un titre de date au-dessus de chaque groupe ("Lundi 15 juin...")
 $slotsByDate = [];
 foreach ($slots as $slot) {
     $slotsByDate[$slot['date']][] = $slot;
 }
 
-// Vérifier si l'utilisateur est connecté
-$isLoggedIn  = !empty($_SESSION['user_id']);
-$isOwnPage   = $isLoggedIn && $_SESSION['user_id'] == $proId;
+// Deux cas particuliers à gérer dans l'affichage :
+$isLoggedIn = !empty($_SESSION['user_id']);                     // visiteur non connecté
+$isOwnPage  = $isLoggedIn && $_SESSION['user_id'] == $proId;    // le pro regarde sa propre page
 
 layoutHeader("Réserver avec " . $pro['name']);
 ?>
 
-    <!-- Header profil -->
+    <!-- En-tête du profil : avatar, nom, bio -->
     <div class="mb-10 text-center">
         <div class="w-20 h-20 rounded-full bg-blue-100 text-blue-700 text-2xl font-bold flex items-center justify-center mx-auto mb-4">
             <?= avatar($pro['name']) ?>
@@ -57,7 +69,6 @@ layoutHeader("Réserver avec " . $pro['name']);
         <p class="text-xs text-gray-300 mt-2">Sur Slotify depuis <?= date('F Y', strtotime($pro['created_at'])) ?></p>
     </div>
 
-    <!-- Créneaux disponibles -->
 <?php if (empty($slots)): ?>
     <div class="bg-white border border-dashed border-gray-300 rounded-xl p-12 text-center text-gray-400 max-w-lg mx-auto">
         <p class="text-4xl mb-3">😴</p>
@@ -89,13 +100,25 @@ layoutHeader("Réserver avec " . $pro['name']);
                     <?php foreach ($dateSlots as $slot): ?>
                         <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between hover:shadow-sm transition">
                             <div>
-                                <p class="font-semibold text-gray-900"><?= e($slot['title']) ?></p>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <p class="font-semibold text-gray-900"><?= e($slot['title']) ?></p>
+                                    <?= typeBadge($slot) ?>
+                                </div>
                                 <p class="text-sm text-gray-400 mt-0.5">
                                     🕐 <?= substr($slot['start_time'],0,5) ?> – <?= substr($slot['end_time'],0,5) ?>
+                                    &nbsp;·&nbsp; <?= formatPrice($slot['price'] ?? null) ?>
                                 </p>
+                                <?php // L'adresse est publique. Le lien visio, lui, n'apparaît
+                                // JAMAIS ici : il n'est révélé qu'après réservation. ?>
+                                <?php if (($slot['type'] ?? '') === 'presentiel' && !empty($slot['location'])): ?>
+                                    <p class="text-xs text-gray-400 mt-0.5">📍 <?= e($slot['location']) ?></p>
+                                <?php endif; ?>
                             </div>
+
                             <?php if (!$isLoggedIn): ?>
-                                <a href="login.php?redirect=profil_public.php?id=<?= $proId ?>"
+                                <?php // urlencode garantit une URL propre : sans lui, le 2e "?"
+                                // de "?id=3" casserait le paramètre redirect ?>
+                                <a href="login.php?redirect=<?= urlencode('profil_public.php?id=' . $proId) ?>"
                                    class="text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition">
                                     Se connecter pour réserver
                                 </a>

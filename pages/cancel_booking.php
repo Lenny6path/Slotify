@@ -38,7 +38,9 @@ if ($slot['booked_by'] != $userId) {
     redirect('history.php');
 }
 
-// Vérifier le délai de 24h
+// Règle métier : annulation possible jusqu'à 24h avant le RDV.
+// On reconstruit le datetime complet du créneau (date + heure),
+// puis on calcule combien d'heures il reste d'ici là.
 $slotDatetime = strtotime($slot['date'] . ' ' . $slot['start_time']);
 $now          = time();
 $heuresRestantes = ($slotDatetime - $now) / 3600;
@@ -48,7 +50,9 @@ if ($heuresRestantes < 24) {
     redirect('history.php');
 }
 
-// Annulation : libérer le créneau + supprimer le booking
+// L'annulation remet le créneau en vente : is_booked repasse à 0
+// et booked_by est vidé. On nettoie aussi la table bookings.
+// Même principe de transaction que pour la réservation.
 try {
     $pdo->beginTransaction();
 

@@ -2,6 +2,11 @@
 
 // ============================================================
 // history.php — Historique complet des réservations
+//
+// Cette page regroupe deux choses différentes :
+//   - les RDV "reçus"    : mes créneaux que des clients ont réservés
+//   - les RDV "effectués": les créneaux que J'AI réservés chez d'autres pros
+// On les affiche ensemble avec un système de filtres.
 // ============================================================
 
 require_once __DIR__ . '/../config/init.php';
@@ -11,14 +16,19 @@ requireAuth();
 
 $userId = $_SESSION['user_id'];
 
-// Filtre
-$filter = $_GET['filter'] ?? 'all'; // all | mine | booked
+// Filtre actif, passé dans l'URL : all / received / made
+$filter = $_GET['filter'] ?? 'all';
 
-// Rendez-vous reçus (créneaux du pro réservés par des clients)
+// --- RDV reçus : mes créneaux réservés par quelqu'un ---
+// Le JOIN sur booked_by nous donne le nom du client.
+// ATTENTION : on nomme l'alias "direction" et surtout PAS "type",
+// car s.* contient déjà une colonne type (presentiel/visio).
+// Si on l'appelait "type", il écraserait la vraie valeur et on
+// perdrait l'info visio/présentiel. (bug vécu, plus jamais ça)
 $stmtReceived = $pdo->prepare("
     SELECT s.*,
-           u.name  AS client_name,
-           'received' AS type
+           u.name AS client_name,
+           'received' AS direction
     FROM slots s
     JOIN users u ON u.id = s.booked_by
     WHERE s.user_id = ? AND s.is_booked = 1
@@ -27,11 +37,12 @@ $stmtReceived = $pdo->prepare("
 $stmtReceived->execute([$userId]);
 $received = $stmtReceived->fetchAll();
 
-// Réservations faites par l'utilisateur (chez d'autres pros)
+// --- RDV effectués : ceux que j'ai réservés chez les autres ---
+// Ici le JOIN est sur user_id pour récupérer le nom du pro.
 $stmtMade = $pdo->prepare("
     SELECT s.*,
-           u.name  AS pro_name,
-           'made' AS type
+           u.name AS pro_name,
+           'made' AS direction
     FROM slots s
     JOIN users u ON u.id = s.user_id
     WHERE s.booked_by = ? AND s.user_id != ?
@@ -40,15 +51,17 @@ $stmtMade = $pdo->prepare("
 $stmtMade->execute([$userId, $userId]);
 $made = $stmtMade->fetchAll();
 
-// Fusionner selon filtre
+// --- Application du filtre ---
+// Pour "tous", on fusionne les deux listes puis on retrie par
+// date+heure décroissante (le plus récent en premier).
 if ($filter === 'received') {
     $all = $received;
 } elseif ($filter === 'made') {
     $all = $made;
 } else {
     $all = array_merge($received, $made);
-    // Trier par date décroissante
-    usort($all, function($a, $b) {
+    usort($all, function ($a, $b) {
+        // Concaténer date + heure donne une chaîne triable directement
         return strcmp($b['date'] . $b['start_time'], $a['date'] . $a['start_time']);
     });
 }
@@ -62,7 +75,7 @@ layoutHeader("Historique");
             <p class="text-gray-400 text-sm mt-1">Tous vos rendez-vous passés et à venir.</p>
         </div>
 
-        <!-- Filtres -->
+        <!-- Boutons de filtre : le filtre actif est en bleu plein -->
         <div class="flex gap-2 text-sm">
             <a href="?filter=all"
                class="px-4 py-2 rounded-lg transition font-medium <?= $filter === 'all' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-blue-300' ?>">
@@ -89,14 +102,16 @@ layoutHeader("Historique");
 
     <div class="space-y-3">
         <?php foreach ($all as $item):
-            $isPast    = $item['date'] < date('Y-m-d');
-            $isReceived = $item['type'] === 'received';
+            // Deux infos qui pilotent tout l'affichage de la card :
+            $isPast     = $item['date'] < date('Y-m-d');       // RDV déjà passé ?
+            $isReceived = $item['direction'] === 'received';   // reçu ou effectué ?
             ?>
 
+            <!-- Les RDV passés sont grisés (opacity) pour les distinguer -->
             <div class="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between gap-4 hover:shadow-sm transition <?= $isPast ? 'opacity-60' : '' ?>">
 
                 <div class="flex items-center gap-4">
-                    <!-- Icône type -->
+                    <!-- Pastille : 📥 = RDV reçu / 📤 = RDV effectué -->
                     <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0
                     <?= $isReceived ? 'bg-green-100' : 'bg-blue-100' ?>">
                         <?= $isReceived ? '📥' : '📤' ?>
@@ -121,11 +136,32 @@ layoutHeader("Historique");
                             <?php else: ?>
                                 <span class="text-gray-500">Chez : <?= e($item['pro_name']) ?></span>
                             <?php endif; ?>
+                            <?php if (!empty($item['price']) && (float)$item['price'] > 0): ?>
+                                &nbsp;·&nbsp; <span class="font-medium text-gray-600"><?= number_format((float)$item['price'], 2, ',', ' ') ?> €</span>
+                            <?php endif; ?>
                         </p>
+
+                        <!-- Accès au lieu / à la visio, uniquement pour les RDV à venir.
+                             C'est ici que le client récupère le lien Zoom/Meet : il n'est
+                             visible qu'APRÈS réservation, jamais sur la page publique. -->
+                        <?php if (!$isPast): ?>
+                            <?php if (($item['type'] ?? 'presentiel') === 'visio' && !empty($item['meeting_link'])): ?>
+                                <a href="<?= e($item['meeting_link']) ?>" target="_blank"
+                                   class="inline-flex items-center gap-1.5 mt-2 text-xs bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-200 px-3 py-1.5 rounded-lg transition font-medium">
+                                    🎥 Rejoindre la visio
+                                </a>
+                            <?php elseif (!empty($item['location'])): ?>
+                                <a href="<?= e(mapsLink($item['location'])) ?>" target="_blank"
+                                   class="inline-flex items-center gap-1.5 mt-2 text-xs bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200 px-3 py-1.5 rounded-lg transition font-medium">
+                                    📍 <?= e($item['location']) ?>
+                                </a>
+                            <?php endif; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
 
-                <!-- Action : annuler si futur et réservation faite par moi -->
+                <!-- On ne peut annuler QUE ses propres réservations futures.
+                     Le délai des 24h est vérifié côté serveur dans cancel_booking.php -->
                 <?php if (!$isPast && !$isReceived): ?>
                     <form method="POST" action="cancel_booking.php"
                           onsubmit="return confirm('Annuler cette réservation ?')">

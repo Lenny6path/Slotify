@@ -1,7 +1,12 @@
 <?php
 
 // ============================================================
-// confirm_booking.php — Page de confirmation avant réservation
+// confirm_booking.php — L'étape "Vérifiez avant de valider"
+//
+// Page intermédiaire entre le clic "Réserver" et la vraie
+// réservation. Elle récapitule tout (pro, prestation, date,
+// prix, lieu) pour éviter les réservations par erreur.
+// Le vrai traitement se fait ensuite dans book_slot.php.
 // ============================================================
 
 require_once __DIR__ . '/../config/init.php';
@@ -46,10 +51,11 @@ if ($slot['user_id'] == $userId) {
     redirect('slots.php');
 }
 
-// Formater les infos
+// Mise en forme pour l'affichage
 $dateFormatted = date('l d F Y', strtotime($slot['date']));
 $heureDebut    = substr($slot['start_time'], 0, 5);
 $heureFin      = substr($slot['end_time'],   0, 5);
+// Durée en minutes : différence des deux timestamps / 60
 $dureeMin      = (strtotime($slot['end_time']) - strtotime($slot['start_time'])) / 60;
 
 layoutHeader("Confirmer la réservation");
@@ -98,6 +104,31 @@ layoutHeader("Confirmer la réservation");
                     <div>
                         <p class="text-xs text-gray-400">Horaire</p>
                         <p class="font-semibold text-gray-800"><?= $heureDebut ?> – <?= $heureFin ?> <span class="text-gray-400 font-normal text-sm">(<?= $dureeMin ?> min)</span></p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xl">💰</span>
+                    <div>
+                        <p class="text-xs text-gray-400">Tarif</p>
+                        <p class="font-semibold text-gray-800"><?= formatPrice($slot['price'] ?? null) ?></p>
+                        <?php if (!empty($slot['price']) && (float)$slot['price'] > 0): ?>
+                            <p class="text-xs text-gray-400">À régler directement auprès du professionnel.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-xl"><?= ($slot['type'] ?? 'presentiel') === 'visio' ? '🎥' : '📍' ?></span>
+                    <div>
+                        <p class="text-xs text-gray-400">Lieu</p>
+                        <?php if (($slot['type'] ?? 'presentiel') === 'visio'): ?>
+                            <p class="font-semibold text-gray-800">En visioconférence</p>
+                            <p class="text-xs text-gray-400">Le lien vous sera communiqué après confirmation.</p>
+                        <?php else: ?>
+                            <p class="font-semibold text-gray-800"><?= e($slot['location'] ?? 'Adresse non précisée') ?></p>
+                            <?php if (!empty($slot['location'])): ?>
+                                <a href="<?= e(mapsLink($slot['location'])) ?>" target="_blank" class="text-xs text-blue-500 hover:underline">Voir sur Google Maps →</a>
+                            <?php endif; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

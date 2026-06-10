@@ -21,6 +21,10 @@ if ($slotId <= 0) {
     redirect('dashboard.php');
 }
 
+// Le "AND user_id = ?" est crucial : il garantit qu'on ne peut
+// supprimer QUE ses propres créneaux. Sans lui, n'importe qui
+// pourrait supprimer les créneaux des autres en bidouillant
+// le slot_id dans le formulaire.
 $stmt = $pdo->prepare("SELECT id, is_booked FROM slots WHERE id = ? AND user_id = ? LIMIT 1");
 $stmt->execute([$slotId, $userId]);
 $slot = $stmt->fetch();
@@ -30,6 +34,8 @@ if (!$slot) {
     redirect('dashboard.php');
 }
 
+// On refuse de supprimer un créneau réservé : un client compte
+// dessus ! Il faudrait d'abord que la réservation soit annulée.
 if ($slot['is_booked']) {
     flashSet('error', 'Impossible de supprimer un créneau déjà réservé.');
     redirect('dashboard.php');

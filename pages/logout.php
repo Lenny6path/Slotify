@@ -9,7 +9,10 @@ require_once __DIR__ . '/../config/init.php';
 // Vider toutes les variables de session
 $_SESSION = [];
 
-// Supprimer le cookie de session côté navigateur
+// session_destroy() ne suffit pas : le cookie PHPSESSID reste
+// dans le navigateur. On le fait expirer en lui donnant une
+// date dans le passé — c'est la façon standard de "supprimer"
+// un cookie côté client.
 if (ini_get("session.use_cookies")) {
     $params = session_get_cookie_params();
     setcookie(

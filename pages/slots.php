@@ -1,7 +1,11 @@
 <?php
 
 // ============================================================
-// slots.php — Vue des créneaux disponibles
+// slots.php — Le "catalogue" de tous les créneaux à venir
+//
+// Contrairement à profil_public.php (créneaux d'UN seul pro),
+// ici on liste les créneaux de TOUS les professionnels, avec
+// un filtre par date optionnel.
 // ============================================================
 
 require_once __DIR__ . '/../config/init.php';
@@ -12,6 +16,10 @@ requireAuth();
 $userId     = $_SESSION['user_id'];
 $filterDate = trim($_GET['date'] ?? '');
 
+// La requête est construite en deux temps : la base d'abord,
+// puis on ajoute la condition de date SEULEMENT si un filtre
+// est actif. Le ? + $params garde la protection contre les
+// injections SQL même avec cette construction dynamique.
 $query  = "
     SELECT s.*, u.name AS owner_name, u.id AS owner_id
     FROM slots s
@@ -72,9 +80,17 @@ layoutHeader("Créneaux disponibles");
                     <?= statusBadge($slot) ?>
                 </div>
 
+                <div class="flex items-center gap-2">
+                    <?= typeBadge($slot) ?>
+                    <span class="text-sm"><?= formatPrice($slot['price'] ?? null) ?></span>
+                </div>
+
                 <div class="text-sm text-gray-400 space-y-1">
                     <p>📅 <?= date('d/m/Y', strtotime($slot['date'])) ?></p>
                     <p>🕐 <?= substr($slot['start_time'],0,5) ?> – <?= substr($slot['end_time'],0,5) ?></p>
+                    <?php if (($slot['type'] ?? '') === 'presentiel' && !empty($slot['location'])): ?>
+                        <p>📍 <a href="<?= e(mapsLink($slot['location'])) ?>" target="_blank" class="text-orange-500 hover:underline"><?= e($slot['location']) ?></a></p>
+                    <?php endif; ?>
                     <p>👤 <a href="profil_public.php?id=<?= $slot['owner_id'] ?>" class="text-blue-500 hover:underline"><?= e($slot['owner_name']) ?></a></p>
                 </div>
 

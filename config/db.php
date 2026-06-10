@@ -1,4 +1,3 @@
-
 <?php
 
 // ============================================================
@@ -16,8 +15,14 @@ try {
         $username,
         $password,
         [
+            // Les erreurs SQL lèvent des exceptions -> on les attrape
+            // proprement au lieu d'avoir des échecs silencieux
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            // fetch() renvoie des tableaux associatifs ($row['name'])
+            // plutôt que doublés avec des index numériques
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            // Vraies requêtes préparées côté MySQL (et non simulées
+            // par PHP) : meilleure protection anti-injection
             PDO::ATTR_EMULATE_PREPARES   => false,
         ]
     );

@@ -36,6 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($stmt->fetch()) {
             $error = "Cet email est déjà utilisé.";
         } else {
+            // PASSWORD_DEFAULT = bcrypt actuellement. Le hash inclut
+            // automatiquement un "sel" aléatoire : deux utilisateurs avec
+            // le même mot de passe auront des hash différents en base.
+            // Le plan n'est pas précisé ici : la colonne a DEFAULT 'free'.
             $password = password_hash($passwordRaw, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
             $stmt->execute([$name, $email, $password]);

@@ -2,6 +2,10 @@
 
 // ============================================================
 // dashboard.php — Tableau de bord du professionnel
+//
+// La page d'accueil une fois connecté. Elle agrège pas mal de
+// chiffres (5 requêtes COUNT/SUM) : c'est volontairement simple,
+// avec le volume d'un projet comme celui-ci ça reste instantané.
 // ============================================================
 
 require_once __DIR__ . '/../config/init.php';
@@ -33,7 +37,27 @@ $stmtMonthBooked = $pdo->prepare("SELECT COUNT(*) FROM slots WHERE user_id = ? A
 $stmtMonthBooked->execute([$userId]);
 $monthBooked = (int) $stmtMonthBooked->fetchColumn();
 
+// Taux de remplissage = réservés / total du mois, en %.
+// Le ternaire évite la division par zéro quand le mois est vide.
 $fillRate = $monthTotal > 0 ? round(($monthBooked / $monthTotal) * 100) : 0;
+
+// --- Revenus = somme des prix des créneaux réservés ---
+// COALESCE transforme le NULL de SUM() en 0 quand il n'y a
+// aucune ligne (sinon PHP afficherait un vide bizarre).
+$stmtRevenue = $pdo->prepare("SELECT COALESCE(SUM(price), 0) FROM slots WHERE user_id = ? AND is_booked = 1");
+$stmtRevenue->execute([$userId]);
+$totalRevenue = (float) $stmtRevenue->fetchColumn();
+
+$stmtRevenueMonth = $pdo->prepare("SELECT COALESCE(SUM(price), 0) FROM slots WHERE user_id = ? AND is_booked = 1 AND MONTH(date) = MONTH(CURDATE()) AND YEAR(date) = YEAR(CURDATE())");
+$stmtRevenueMonth->execute([$userId]);
+$monthRevenue = (float) $stmtRevenueMonth->fetchColumn();
+
+// --- Plan et quota ---
+// On récupère le plan et la consommation pour la bannière de quota.
+// canCreateSlot renvoie [peut_creer, utilisés, limite] mais ici seuls
+// les deux derniers nous intéressent (d'où le null en 1ère position).
+$userPlan = getUserPlan($pdo);
+list(, $usedSlots, $slotLimit) = canCreateSlot($pdo, $userId);
 
 // --- Prochain RDV réservé ---
 $stmtNext = $pdo->prepare("
@@ -65,7 +89,10 @@ layoutHeader("Dashboard");
     <!-- En-tête -->
     <div class="mb-8 flex items-center justify-between">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Bonjour, <?= e($_SESSION['user_name']) ?> 👋</h1>
+            <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                Bonjour, <?= e($_SESSION['user_name']) ?> 👋
+                <?= planBadge($pdo) ?>
+            </h1>
             <p class="text-gray-400 text-sm mt-1"><?= date('l d F Y') ?></p>
         </div>
         <a href="profil_public.php?id=<?= $userId ?>" target="_blank"
@@ -73,6 +100,28 @@ layoutHeader("Dashboard");
             🔗 Mon lien public
         </a>
     </div>
+
+    <!-- Bannière quota plan Free -->
+<?php if ($userPlan === 'free'): ?>
+    <div class="mb-6 flex items-center justify-between bg-white border <?= $usedSlots >= $slotLimit ? 'border-amber-300 bg-amber-50' : 'border-gray-200' ?> rounded-xl px-5 py-3.5">
+        <div class="flex items-center gap-3">
+            <span class="text-lg"><?= $usedSlots >= $slotLimit ? '🔒' : '📊' ?></span>
+            <div>
+                <p class="text-sm font-medium text-gray-700">
+                    Plan Free — <?= $usedSlots ?>/<?= $slotLimit ?> créneaux actifs
+                </p>
+                <div class="mt-1 bg-gray-100 rounded-full h-1.5 w-48">
+                    <div class="<?= $usedSlots >= $slotLimit ? 'bg-amber-400' : 'bg-blue-500' ?> h-1.5 rounded-full transition-all"
+                         style="width: <?= min(100, round($usedSlots / $slotLimit * 100)) ?>%"></div>
+                </div>
+            </div>
+        </div>
+        <a href="upgrade.php"
+           class="text-xs font-bold bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white px-4 py-2 rounded-lg transition whitespace-nowrap">
+            ⭐ Passer Pro
+        </a>
+    </div>
+<?php endif; ?>
 
     <!-- Prochain RDV mis en avant -->
 <?php if ($nextBooking): ?>
@@ -93,7 +142,7 @@ layoutHeader("Dashboard");
 <?php endif; ?>
 
     <!-- Cartes stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
 
         <div class="bg-white border border-gray-200 rounded-xl p-5">
             <p class="text-xs font-medium text-gray-400 uppercase tracking-wide">Total créneaux</p>
@@ -118,6 +167,12 @@ layoutHeader("Dashboard");
             <div class="mt-2 bg-gray-100 rounded-full h-1.5">
                 <div class="bg-blue-500 h-1.5 rounded-full transition-all" style="width: <?= $fillRate ?>%"></div>
             </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-emerald-500 to-green-600 text-white rounded-xl p-5">
+            <p class="text-xs font-medium text-emerald-100 uppercase tracking-wide">💰 Revenus</p>
+            <p class="text-3xl font-bold mt-1"><?= number_format($totalRevenue, 0, ',', ' ') ?> €</p>
+            <p class="text-xs text-emerald-100 mt-1">dont <?= number_format($monthRevenue, 0, ',', ' ') ?> € ce mois</p>
         </div>
 
     </div>
@@ -146,6 +201,8 @@ layoutHeader("Dashboard");
                 <th class="text-left px-5 py-3 font-medium">Titre</th>
                 <th class="text-left px-5 py-3 font-medium">Date</th>
                 <th class="text-left px-5 py-3 font-medium">Horaire</th>
+                <th class="text-left px-5 py-3 font-medium">Type</th>
+                <th class="text-left px-5 py-3 font-medium">Prix</th>
                 <th class="text-left px-5 py-3 font-medium">Statut</th>
                 <th class="text-left px-5 py-3 font-medium">Client</th>
                 <th class="px-5 py-3"></th>
@@ -157,6 +214,8 @@ layoutHeader("Dashboard");
                     <td class="px-5 py-3.5 font-medium text-gray-900"><?= e($slot['title']) ?></td>
                     <td class="px-5 py-3.5 text-gray-500"><?= date('d/m/Y', strtotime($slot['date'])) ?></td>
                     <td class="px-5 py-3.5 text-gray-500"><?= substr($slot['start_time'],0,5) ?> – <?= substr($slot['end_time'],0,5) ?></td>
+                    <td class="px-5 py-3.5"><?= typeBadge($slot) ?></td>
+                    <td class="px-5 py-3.5 text-sm"><?= formatPrice($slot['price'] ?? null) ?></td>
                     <td class="px-5 py-3.5"><?= statusBadge($slot) ?></td>
                     <td class="px-5 py-3.5 text-gray-400"><?= $slot['booked_by_name'] ? e($slot['booked_by_name']) : '—' ?></td>
                     <td class="px-5 py-3.5 text-right">
